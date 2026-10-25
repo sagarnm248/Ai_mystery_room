@@ -2,6 +2,7 @@ services:
   - type: web
     name: ai-mystery-room-api
     runtime: node
+    plan: free
     buildCommand: npm install
     startCommand: npm start -w server
     healthCheckPath: /api/v1/health
