@@ -72,17 +72,22 @@ async function runGeneration(c) {
     c.safeMessage = undefined;
     await c.save();
   } catch (error) {
+    console.error('Generation error:', error.cause || error);
     c.status = 'FAILED';
     c.safeMessage = error.safeCode === 'PROVIDER_NOT_CONFIGURED'
       ? 'Case generation is not configured. Add a Gemini API key on the server.'
       : 'We could not assemble a consistent case. Please retry.';
-    c.generation = { ...(c.generation || {}), safeFailureCode: error.safeCode || 'GENERATION_FAILED' };
+    c.generation = { 
+      ...(c.generation || {}), 
+      safeFailureCode: error.safeCode || 'GENERATION_FAILED',
+      errorDetail: String(error.cause?.message || error.message || error)
+    };
     c.markModified('generation');
     await c.save();
   }
 }
 
-router.get('/health', (_req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', version: '1.0.1' }));
+router.get('/health', (_req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', version: '1.0.2', model: process.env.GEMINI_MODEL }));
 
 router.post('/cases', async (req, res) => {
   const settingsSchema = z.object({

@@ -87,6 +87,7 @@ export async function generateMystery(storySeed, settings) {
       });
       return validateCase(JSON.parse(response.text), settings.difficulty);
     } catch (error) {
+      console.error(`Generation attempt ${attempt} failed:`, error.message);
       lastError = error;
     }
   }
