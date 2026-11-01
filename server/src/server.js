@@ -87,7 +87,7 @@ async function runGeneration(c) {
   }
 }
 
-router.get('/health', (_req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', version: '1.0.2', model: process.env.GEMINI_MODEL }));
+router.get('/health', (_req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', version: '1.0.3', model: process.env.GEMINI_MODEL }));
 
 router.post('/cases', async (req, res) => {
   const settingsSchema = z.object({
@@ -97,7 +97,7 @@ router.post('/cases', async (req, res) => {
     targetMinutes: z.union([z.literal(10), z.literal(20), z.literal(30)]).default(20),
     evidenceTypes: z.array(z.enum(['CHAT', 'IMAGE', 'STATEMENT', 'TIMELINE', 'CCTV_LOG', 'FORENSIC_NOTE'])).min(1).default(['CHAT', 'IMAGE', 'STATEMENT', 'TIMELINE', 'CCTV_LOG', 'FORENSIC_NOTE']),
   }).default({});
-  const schema = z.object({ storySeed: z.string().trim().min(30).max(1500), settings: settingsSchema, idempotencyKey: z.string().max(100).optional() });
+  const schema = z.object({ storySeed: z.string().trim().min(30).max(1500), settings: settingsSchema.optional().default({}), idempotencyKey: z.string().max(100).optional() });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return sendError(res, 400, 'VALIDATION_ERROR', parsed.error.issues[0].message);
   const ownerSessionId = ensureOwner(req);
@@ -105,7 +105,14 @@ router.post('/cases', async (req, res) => {
     const existing = await MysteryCase.findOne({ ownerSessionId, idempotencyKey: parsed.data.idempotencyKey });
     if (existing) return res.status(202).json({ caseId: existing._id, status: existing.status, pollUrl: `/api/v1/cases/${existing._id}/status` });
   }
-  const c = await MysteryCase.create({ ownerSessionId, status: 'GENERATING', storySeed: parsed.data.storySeed, settings: parsed.data.settings, idempotencyKey: parsed.data.idempotencyKey, generation: { attemptCount: 1 } });
+  const resolvedSettings = {
+    difficulty: parsed.data.settings?.difficulty || 'MEDIUM',
+    genre: parsed.data.settings?.genre || 'ANY',
+    tone: parsed.data.settings?.tone || 'GROUNDED',
+    targetMinutes: parsed.data.settings?.targetMinutes || 20,
+    evidenceTypes: parsed.data.settings?.evidenceTypes || ['CHAT', 'IMAGE', 'STATEMENT', 'TIMELINE', 'CCTV_LOG', 'FORENSIC_NOTE'],
+  };
+  const c = await MysteryCase.create({ ownerSessionId, status: 'GENERATING', storySeed: parsed.data.storySeed, settings: resolvedSettings, idempotencyKey: parsed.data.idempotencyKey, generation: { attemptCount: 1 } });
   res.status(202).json({ caseId: c._id, status: c.status, pollUrl: `/api/v1/cases/${c._id}/status` });
   setImmediate(() => runGeneration(c));
 });
