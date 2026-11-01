@@ -82,7 +82,7 @@ async function runGeneration(c) {
   }
 }
 
-router.get('/health', (_req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' }));
+router.get('/health', (_req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', version: '1.0.1' }));
 
 router.post('/cases', async (req, res) => {
   const settingsSchema = z.object({
