@@ -17,10 +17,31 @@ const CaseOutput = z.object({
   clues: z.array(z.object({ id: z.string(), title: z.string(), description: z.string(), evidenceIds: z.array(z.string()) })),
   hints: z.array(z.string()),
   solution: z.object({ culpritId: z.string(), motive: z.string(), method: z.string(), opportunity: z.string(), explanation: z.string(), deductions: z.array(z.object({ step: z.string(), evidenceIds: z.array(z.string()) })).min(2) }),
-  consistencyChecklist: z.array(z.string()).default([]),
+  consistencyChecklist: z.any().optional(),
 });
 
 function validateCase(candidate, difficulty) {
+  // Auto-heal bidirectional references if missing
+  if (Array.isArray(candidate.clues) && Array.isArray(candidate.evidence)) {
+    for (const clue of candidate.clues) {
+      if (Array.isArray(clue.evidenceIds)) {
+        for (const evId of clue.evidenceIds) {
+          const ev = candidate.evidence.find(item => item.id === evId);
+          if (ev) {
+            if (!Array.isArray(ev.supports)) ev.supports = [];
+            if (!ev.supports.includes(clue.id)) ev.supports.push(clue.id);
+          }
+        }
+      }
+    }
+    const clueIds = candidate.clues.map(x => x.id);
+    for (const ev of candidate.evidence) {
+      if (Array.isArray(ev.supports)) {
+        ev.supports = ev.supports.filter(id => clueIds.includes(id));
+      }
+    }
+  }
+
   const c = CaseOutput.parse(candidate);
   const rules = DIFFICULTY_RULES[difficulty];
   const suspectIds = c.suspects.map(x => x.id);
@@ -60,7 +81,7 @@ export async function generateMystery(storySeed, settings) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await ai.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+        model: process.env.GEMINI_MODEL || 'gemini-3.5-flash',
         contents: promptFor(storySeed, settings),
         config: { responseMimeType: 'application/json', httpOptions: { timeout: Number(process.env.GENERATION_TIMEOUT_MS || 60000) } },
       });
