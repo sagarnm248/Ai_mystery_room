@@ -1,4 +1,6 @@
-const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+const rawBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1').trim();
+const normalized = rawBase.replace(/\/+$/, '');
+const BASE = normalized.endsWith('/api/v1') ? normalized : `${normalized}/api/v1`;
 export async function api(path, options = {}) {
   const response = await fetch(`${BASE}${path}`, { credentials: 'include', ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
   const data = await response.json().catch(() => ({}));
